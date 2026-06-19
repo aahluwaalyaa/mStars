@@ -3,7 +3,7 @@
  * Demo @ https://mBlocksForBloggers.blogspot.com/
  * Documentation @ m
  * Agency @ https://CIA.RealHappinessCenter.com
- * Copyright (c) 2025, Mohanjeet Singh (https://Mohanjeet.blogspot.com/)
+ * Copyright (c) 2022-26, Mohanjeet Singh (https://Mohanjeet.blogspot.com/)
  * Released under the MIT license
  */
 
@@ -12,6 +12,37 @@ import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebase
 import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js";
 
 //console.log({ initializeApp, getDatabase });
+
+// Inject mStars CSS classes once
+let stylesInjected = false;
+function injectStyles() {
+    if (stylesInjected) return;
+    stylesInjected = true;
+    const style = document.createElement("style");
+    style.textContent = `
+        .mStars { position: relative; }
+        .mStars-wrapper { display: inline-block; }
+        .mStars-wrapper--interactive { margin: 1rem; }
+        .mStars-wrapper--votes { line-height: 0; }
+        .mStars-star { display: inline-block; margin: 0.1rem; }
+        .mStars-star--clickable { cursor: pointer; }
+        .mStars-star--readonly { cursor: inherit; }
+        .mStars-tooltip {
+            border-radius: 7px;
+            position: absolute;
+            background: rgba(255, 215, 0, 100%);
+            padding: 5px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 1s;
+            width: 200px;
+            box-sizing: border-box;
+            z-index: 9999999;
+        }
+        .mStars-tooltip--visible { opacity: 1; }
+    `;
+    document.head.appendChild(style);
+}
 
 function pathFormat(p, host) {
     let e = p.split("?")[0].split("#")[0].replace("https:", "").replace("http:", "").replace("file:", "").replace("ftp:", "").replace("mailto:", "");
@@ -25,15 +56,18 @@ function pathFormat(p, host) {
 
 //mStars Render
 function sRender(e, S, isD, isV, R, p, tTop) {
-    const w = document.createElement("div"), n = S["sNo"]; w.style.width = (S["sSize"] + 0.1 * 2) * n + "rem", w.style = "display:inline-block;", e.insertBefore(w, e.lastChild);
-    !isD && (w.style.margin = "1rem");
-    isV && (w.style.lineHeight = 0);
+    const w = document.createElement("div"), n = S["sNo"];
+    w.classList.add("mStars-wrapper");
+    w.style.width = (S["sSize"] + 0.1 * 2) * n + "rem"; // dynamic: kept inline
+    !isD && w.classList.add("mStars-wrapper--interactive");
+    isV && w.classList.add("mStars-wrapper--votes");
+    e.insertBefore(w, e.lastChild);
 
     for (let i = 1; i <= n; i++) {
         w.insertAdjacentHTML("beforeend", '<svg xmlns="http://www.w3.org/2000/svg" width="' + S["sSize"] + 'rem" height="' + S["sSize"] + 'rem" fill="gold" class="bi bi-star-fill" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z" /></svg >');
         const s = w.lastChild;
-        s.style = "display:inline-block;margin:0.1rem",
-            s.style.cursor = !R && !isD ? "pointer" : "inherit";
+        s.classList.add("mStars-star");
+        s.classList.add(!R && !isD ? "mStars-star--clickable" : "mStars-star--readonly");
 
         !isD && (s.onmouseenter = function () {
             if (!localStorage["mSR_" + p]) {
@@ -65,17 +99,21 @@ function sUpdate(e, rating) {
 
 //onclick tooltip renderer
 function tTip(t, e, r, f) {
-    const T = document.createElement("div"); T.innerHTML = t.replace(/\$userRating\$/g, r), T.style = "border-radius:7px;position:absolute;background:rgba(255,215,0,100%);padding:5px;text-align:center;opacity:0;transition:opacity 1s;width:200px;boxSizing:border-box;zIndex:9999999", T.style.fontSize = f; document.body.appendChild(T);
+    const T = document.createElement("div");
+    T.innerHTML = t.replace(/\$userRating\$/g, r);
+    T.classList.add("mStars-tooltip");
+    T.style.fontSize = f; // dynamic: kept inline
+    document.body.appendChild(T);
     //    console.log({t:T.style.fontSize,f});
     let b = e.getBoundingClientRect();
     //            console.log({eCoordinates});
     setTimeout(function () {
-        T.style.opacity = "1";
+        T.classList.add("mStars-tooltip--visible");
         T.style.left = e.style.textAlign === "right" ? (window.scrollX + b.left + e.offsetWidth - 200 + "px") : e.style.textAlign === "center" ? (window.scrollX + b.left + e.offsetWidth / 2 - 100 + "px") : window.scrollX + b.left + "px";
         T.style.top = window.scrollY + b.top + 44 + "px";
         //        console.log(T.style.top, b.top, T.offsetHeight, window.scrollY);
     }, 10),
-        setTimeout(function () { T.style.opacity = 0, setTimeout(function () { document.body.removeChild(T); }, 1e3); }, 3500);
+        setTimeout(function () { T.classList.remove("mStars-tooltip--visible"), setTimeout(function () { document.body.removeChild(T); }, 1e3); }, 3500);
 }
 
 function mStars(m, p, db) {
@@ -117,7 +155,8 @@ function mStars(m, p, db) {
     S["tBottom"] = D["tBottom-" + s];
     //    console.log(sSet["tBottomD-lg"]);
     //console.log(sSize,m.dataset);
-    m.style.textAlign = S["sAlign"], m.style.position = "relative";
+    m.style.textAlign = S["sAlign"]; // dynamic: kept inline
+    // position: relative is now applied via .mStars CSS class
 
     let R = localStorage["mSR_" + p];
     //console.log(sSet["sSize"],isM);
@@ -138,14 +177,14 @@ function mStars(m, p, db) {
 
     //        console.log({ db });
     onValue(db, s => {
-     var rArr = s.val() || { "r": 0, "c": 0 },
+        var rArr = s.val() || { "r": 0, "c": 0 },
             rating = (rArr.r * S["sNo"]).toFixed(2);
         //                    console.log({ rArr });
         if (rArr.c == 0) {
             rArr = { "r": 1, "c": 1 }; //set to 1 to avoid search console error
             set(db, rArr);
         }
-        
+
         sUpdate(m, rating);         //Render stars
 
         (!isD || isV) && (
@@ -232,6 +271,7 @@ function mStarsCB(entries, observer) {
     });
 }
 
+injectStyles();
 const options = { rootMargin: '500px', threshold: 0.0 };
 let f = !0,
     observer = new IntersectionObserver(mStarsCB, options);
