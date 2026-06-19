@@ -58,13 +58,13 @@ function pathFormat(p, host) {
 function sRender(e, S, isD, isV, R, p, tTop) {
     const w = document.createElement("div"), n = S["sNo"];
     w.classList.add("mStars-wrapper");
-    w.style.width = (S["sSize"] + 0.1 * 2) * n + "rem"; // dynamic: kept inline
+    w.style.width = `${(S["sSize"] + 0.1 * 2) * n}rem`; // dynamic: kept inline
     !isD && w.classList.add("mStars-wrapper--interactive");
     isV && w.classList.add("mStars-wrapper--votes");
     e.insertBefore(w, e.lastChild);
 
     for (let i = 1; i <= n; i++) {
-        w.insertAdjacentHTML("beforeend", '<svg xmlns="http://www.w3.org/2000/svg" width="' + S["sSize"] + 'rem" height="' + S["sSize"] + 'rem" fill="gold" class="bi bi-star-fill" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z" /></svg >');
+        w.insertAdjacentHTML("beforeend", `<svg xmlns="http://www.w3.org/2000/svg" width="${S["sSize"]}rem" height="${S["sSize"]}rem" fill="gold" class="bi bi-star-fill" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z" /></svg>`);
         const s = w.lastChild;
         s.classList.add("mStars-star");
         s.classList.add(!R && !isD ? "mStars-star--clickable" : "mStars-star--readonly");
@@ -75,7 +75,7 @@ function sRender(e, S, isD, isV, R, p, tTop) {
                 for (let j = 0; j < s.length; j++) {
                     s[j].style.fill = "gold", s[j].style.opacity = j < i ? 1 : .25;
                 }
-                (S["tTop"] != "") && (tTop.innerHTML = i + "/" + n);
+                (S["tTop"] != "") && (tTop.innerHTML = `${i}/${n}`);
             }
         });
     }
@@ -109,8 +109,12 @@ function tTip(t, e, r, f) {
     //            console.log({eCoordinates});
     setTimeout(function () {
         T.classList.add("mStars-tooltip--visible");
-        T.style.left = e.style.textAlign === "right" ? (window.scrollX + b.left + e.offsetWidth - 200 + "px") : e.style.textAlign === "center" ? (window.scrollX + b.left + e.offsetWidth / 2 - 100 + "px") : window.scrollX + b.left + "px";
-        T.style.top = window.scrollY + b.top + 44 + "px";
+        T.style.left = e.style.textAlign === "right"
+            ? `${window.scrollX + b.left + e.offsetWidth - 200}px`
+            : e.style.textAlign === "center"
+                ? `${window.scrollX + b.left + e.offsetWidth / 2 - 100}px`
+                : `${window.scrollX + b.left}px`;
+        T.style.top = `${window.scrollY + b.top + 44}px`;
         //        console.log(T.style.top, b.top, T.offsetHeight, window.scrollY);
     }, 10),
         setTimeout(function () { T.classList.remove("mStars-tooltip--visible"), setTimeout(function () { document.body.removeChild(T); }, 1e3); }, 3500);
@@ -151,8 +155,8 @@ function mStars(m, p, db) {
     for (let i in D) (typeof (S[i]) == "undefined") && (S[i] = D[i]); //Assign settings by type of current page (for Blogger)
     // console.log({sSet,dSet,m,pType,sType: isM}, m.dataset.display, location.href, location.host);
     S["sSize"] = D["sSize"] * (s == "sm" ? .4 : s == "md" ? .6 : 1);
-    S["tSize"] = D["tSize"] * (s == "sm" ? .7 : s == "md" ? .75 : 1) + "rem";
-    S["tBottom"] = D["tBottom-" + s];
+    S["tSize"] = `${D["tSize"] * (s == "sm" ? .7 : s == "md" ? .75 : 1)}rem`;
+    S["tBottom"] = D[`tBottom-${s}`];
     //    console.log(sSet["tBottomD-lg"]);
     //console.log(sSize,m.dataset);
     m.style.textAlign = S["sAlign"]; // dynamic: kept inline
@@ -222,7 +226,7 @@ function mStars(m, p, db) {
 function sSchema(m, h, a) {
     //        console.log({ m, db });
     const p = pathFormat(m.dataset.url, h),
-        db = ref(getDatabase(a), "mStars/" + h + "/" + p);
+        db = ref(getDatabase(a), `mStars/${h}/${p}`);
 
     onValue(db, s => {
         const rArr = s.val() || { "r": 1, "c": 1 },//set to 1 to avoid search console error
@@ -233,7 +237,7 @@ function sSchema(m, h, a) {
             type = m.dataset.schema,
             j = t[0] || document.createElement("script");
         t.length == 0 && (b.append(j), j.type = 'application/ld+json');
-        j.text = '{"@context": "https://schema.org/","@type": "' + type + '","name": "' + n + '","aggregateRating": {"@type": "AggregateRating","ratingValue": "' + r + '","worstRating": "1","bestRating": "5","ratingCount": "' + rArr.c + '"}}';
+        j.text = `{"@context": "https://schema.org/","@type": "${type}","name": "${n}","aggregateRating": {"@type": "AggregateRating","ratingValue": "${r}","worstRating": "1","bestRating": "5","ratingCount": "${rArr.c}"}}`;
         //            console.log({ b, r, j }, j.textContent);
     }, { onlyOnce: true });
 }
@@ -244,7 +248,7 @@ function i(m) {
         d = document.getElementById("mStars").dataset.db || null,//db Path
         a = !getApps.length ? initializeApp({ "databaseURL": d }, "mStars") : getApp("mStars"),
         p = pathFormat(m.dataset.url, h),
-        db = ref(getDatabase(a), "mStars/" + h + "/" + p);
+        db = ref(getDatabase(a), `mStars/${h}/${p}`);
     //  console.log({ h, p, db });
 
     switch (d) {
@@ -254,7 +258,7 @@ function i(m) {
             if (d.indexOf("https://") !== 0 || d.lastIndexOf("firebaseio.com") < 5)
                 m.innerHTML = "Error! Invalid Firebase URL.";
             else {
-                d.lastIndexOf("/") !== d.length - 1 && (d = d + "/");
+                d.lastIndexOf("/") !== d.length - 1 && (d = `${d}/`);
                 //                        console.log({ f });
                 f && (f = !1, Array.from(document.getElementsByClassName("mStars")).forEach(m => typeof m.dataset.schema != "undefined" && sSchema(m, h, a)));
                 mStars(m, p, db);
