@@ -7,11 +7,18 @@
  * Released under the MIT license
  */
 
-//Covert path into identifier
-import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-app.js";
-import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-database.js";
+// Firebase REST API helpers — replaces the Firebase JS SDK
+function dbRead(dbURL, path) {
+    return fetch(`${dbURL}${path}.json`).then(res => res.ok ? res.json() : null);
+}
 
-//console.log({ initializeApp, getDatabase });
+function dbWrite(dbURL, path, data) {
+    return fetch(`${dbURL}${path}.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+}
 
 // Inject mStars CSS classes once
 let stylesInjected = false;
@@ -33,96 +40,121 @@ function injectStyles() {
             background: rgba(255, 215, 0, 100%);
             padding: 5px;
             text-align: center;
-            opacity: 0;
-            transition: opacity 1s;
             width: 200px;
             box-sizing: border-box;
             z-index: 9999999;
+            bottom: calc(100% + 6px);
+            animation: mStars-fadeInOut 3.5s ease forwards;
         }
-        .mStars-tooltip--visible { opacity: 1; }
+        @keyframes mStars-fadeInOut {
+            0%   { opacity: 0; }
+            10%  { opacity: 1; }
+            80%  { opacity: 1; }
+            100% { opacity: 0; }
+        }
     `;
     document.head.appendChild(style);
 }
 
-function pathFormat(p, host) {
-    let e = p.split("?")[0].split("#")[0].replace("https:", "").replace("http:", "").replace("file:", "").replace("ftp:", "").replace("mailto:", "");
-    for (; "/" == e[0];)e = e.substring(1);
-    for (0 === e.indexOf("www.") && (e = e.replace("www.", "")); "/" == e[e.length - 1];)e = e.substring(0, e.length - 1);
-    //      console.log({e});
-    e = e.replace(/\./g, "_").replace(/\//g, "__").replace(/\,/g, "___").replace(/\s/g, "").replace(/\#/g, "-").replace(/\@/g, "-").replace(/\!/g, "-").replace(/\$/g, "-").replace(/\%/g, "-").replace(/\&/g, "-").replace(/\(/g, "-").replace(/\)/g, "-");
-    return e = e.replace(host, "");
+// Convert URL path into a Firebase-safe identifier string
+function pathFormat(url, host) {
+    let cleaned;
+    try {
+        // Use URL API for http/https URLs
+        const parsed = new URL(url);
+        cleaned = (parsed.hostname + parsed.pathname)
+            .replace(/^www\./, "");
+    } catch {
+        // Fallback for file: / relative URLs — strip protocol and leading slashes
+        cleaned = url.split("?")[0].split("#")[0]
+            .replace(/^[a-z]+:\/\//i, "")
+            .replace(/^www\./, "")
+            .replace(/^\/+|\/+$/g, "");
+    }
+    // Sanitize to Firebase-safe chars
+    cleaned = cleaned.replace(/[./]/g, "_").replace(/[,\s#@!$%&()]/g, "-");
+    return cleaned.replace(host, "");
 }
 
 
 //mStars Render
-function sRender(e, S, isD, isV, R, p, tTop) {
-    const w = document.createElement("div"), n = S["sNo"];
-    w.classList.add("mStars-wrapper");
-    w.style.width = `${(S["sSize"] + 0.1 * 2) * n}rem`; // dynamic: kept inline
-    !isD && w.classList.add("mStars-wrapper--interactive");
-    isV && w.classList.add("mStars-wrapper--votes");
-    e.insertBefore(w, e.lastChild);
+function sRender(container, settings, isDisplayOnly, isVotesMode, userRating, pageKey, labelTop) {
+    const wrapper = document.createElement("div"), starCount = settings["sNo"];
+    wrapper.classList.add("mStars-wrapper");
+    wrapper.style.width = `${(settings["sSize"] + 0.1 * 2) * starCount}rem`; // dynamic: kept inline
+    !isDisplayOnly && wrapper.classList.add("mStars-wrapper--interactive");
+    isVotesMode && wrapper.classList.add("mStars-wrapper--votes");
+    wrapper.setAttribute("role", "group");
+    wrapper.setAttribute("aria-label", `Star rating out of ${starCount}`);
+    container.insertBefore(wrapper, container.lastChild);
 
-    for (let i = 1; i <= n; i++) {
-        w.insertAdjacentHTML("beforeend", `<svg xmlns="http://www.w3.org/2000/svg" width="${S["sSize"]}rem" height="${S["sSize"]}rem" fill="gold" class="bi bi-star-fill" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z" /></svg>`);
-        const s = w.lastChild;
-        s.classList.add("mStars-star");
-        s.classList.add(!R && !isD ? "mStars-star--clickable" : "mStars-star--readonly");
+    for (let i = 1; i <= starCount; i++) {
+        wrapper.insertAdjacentHTML("beforeend", `<svg xmlns="http://www.w3.org/2000/svg" width="${settings["sSize"]}rem" height="${settings["sSize"]}rem" fill="gold" class="bi bi-star-fill" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z" /></svg>`);
+        const star = wrapper.lastChild;
+        const isInteractive = !userRating && !isDisplayOnly;
+        star.classList.add("mStars-star");
+        star.classList.add(isInteractive ? "mStars-star--clickable" : "mStars-star--readonly");
+        star.setAttribute("role", isInteractive ? "button" : "img");
+        star.setAttribute("aria-label", isInteractive ? `Rate ${i} of ${starCount} stars` : `${i} out of ${starCount} stars`);
+        if (isInteractive) star.setAttribute("tabindex", "0");
+    }
 
-        !isD && (s.onmouseenter = function () {
-            if (!localStorage["mSR_" + p]) {
-                let s = e.getElementsByTagName("svg");
-                for (let j = 0; j < s.length; j++) {
-                    s[j].style.fill = "gold", s[j].style.opacity = j < i ? 1 : .25;
-                }
-                (S["tTop"] != "") && (tTop.innerHTML = `${i}/${n}`);
-            }
+    // Delegated hover — single listener on wrapper instead of one per star
+    if (!isDisplayOnly) {
+        wrapper.addEventListener("mouseover", function (event) {
+            const hoveredStar = event.target.closest("svg");
+            if (!hoveredStar || localStorage["mSR_" + pageKey]) return;
+            const allStars = Array.from(wrapper.querySelectorAll("svg"));
+            const hoveredIdx = allStars.indexOf(hoveredStar); // 0-based
+            allStars.forEach((star, j) => {
+                star.style.fill = "gold";
+                star.style.opacity = j <= hoveredIdx ? 1 : .25;
+            });
+            (settings["tTop"] != "") && (labelTop.innerHTML = `${hoveredIdx + 1}/${starCount}`);
         });
     }
-    return w;
+
+    return wrapper;
 }
 
 //Star Renderer
-function sUpdate(e, rating) {
-    //        console.log({ e, rating });
-    const s = e.getElementsByTagName("svg"), r = Math.floor(rating), f = rating - r;
-    //    console.log({s,r,f});
-    for (let i = 1; i <= s.length; i++) {
-        let m = s[i - 1];
-        i > r
-            ? i == r + 1 && f > 0
-                ? m.style.opacity = f
-                : (m.style.fill = "silver", m.style.opacity = .1)
-            : (m.style.fill = "gold", m.style.opacity = 1);
+function sUpdate(container, rating) {
+    //        console.log({ container, rating });
+    const stars = container.getElementsByTagName("svg"), fullStars = Math.floor(rating), fraction = rating - fullStars;
+    //    console.log({ stars, fullStars, fraction });
+    for (let i = 1; i <= stars.length; i++) {
+        let star = stars[i - 1];
+        i > fullStars
+            ? i == fullStars + 1 && fraction > 0
+                ? star.style.opacity = fraction
+                : (star.style.fill = "silver", star.style.opacity = .1)
+            : (star.style.fill = "gold", star.style.opacity = 1);
     }
 }
 
 //onclick tooltip renderer
-function tTip(t, e, r, f) {
-    const T = document.createElement("div");
-    T.innerHTML = t.replace(/\$userRating\$/g, r);
-    T.classList.add("mStars-tooltip");
-    T.style.fontSize = f; // dynamic: kept inline
-    document.body.appendChild(T);
-    //    console.log({t:T.style.fontSize,f});
-    let b = e.getBoundingClientRect();
-    //            console.log({eCoordinates});
-    setTimeout(function () {
-        T.classList.add("mStars-tooltip--visible");
-        T.style.left = e.style.textAlign === "right"
-            ? `${window.scrollX + b.left + e.offsetWidth - 200}px`
-            : e.style.textAlign === "center"
-                ? `${window.scrollX + b.left + e.offsetWidth / 2 - 100}px`
-                : `${window.scrollX + b.left}px`;
-        T.style.top = `${window.scrollY + b.top + 44}px`;
-        //        console.log(T.style.top, b.top, T.offsetHeight, window.scrollY);
-    }, 10),
-        setTimeout(function () { T.classList.remove("mStars-tooltip--visible"), setTimeout(function () { document.body.removeChild(T); }, 1e3); }, 3500);
+function tTip(template, anchorEl, userRating, fontSize) {
+    const tooltip = document.createElement("div");
+    tooltip.innerHTML = template.replace(/\$userRating\$/g, userRating);
+    tooltip.classList.add("mStars-tooltip");
+    tooltip.setAttribute("role", "alert"); // announced by screen readers without needing focus
+    tooltip.style.fontSize = fontSize; // dynamic: kept inline
+    // Position relative to the widget container (already has position:relative via .mStars)
+    tooltip.style.left = anchorEl.style.textAlign === "right"
+        ? `calc(100% - 200px)`
+        : anchorEl.style.textAlign === "center"
+            ? `calc(50% - 100px)`
+            : `0px`;
+    anchorEl.appendChild(tooltip);
+    // CSS animation (mStars-fadeInOut) handles the fade — remove element when done
+    tooltip.addEventListener("animationend", function () {
+        anchorEl.removeChild(tooltip);
+    });
 }
 
-function mStars(m, p, db) {
-    //        console.log({ m, i});
-    //Settings and variable/const defintions
+async function mStars(container, pageKey, dbURL, path) {
+    //        console.log({ container, pageKey });
+    //Settings and variable/const definitions
     const mSettings = {
         "default": {
             "sNo": 5,//Number > 0
@@ -144,124 +176,127 @@ function mStars(m, p, db) {
         "static_page": {}
     }
 
-    //console.log({ m });
-    const t = m.dataset.pagetype,
-        s = m.dataset.size || "lg",
-        isD = (m.dataset.display == "true"),//Display only
-        isV = (m.dataset.votes == "true"),
-        S = mSettings[t],
-        D = mSettings.default;
+    //console.log({ container });
+    const pageType = container.dataset.pagetype,
+        sizeKey = container.dataset.size || "lg",
+        isDisplayOnly = (container.dataset.display == "true"),//Display only
+        isVotesMode = (container.dataset.votes == "true"),
+        settings = mSettings[pageType],
+        defaults = mSettings.default;
 
-    for (let i in D) (typeof (S[i]) == "undefined") && (S[i] = D[i]); //Assign settings by type of current page (for Blogger)
-    // console.log({sSet,dSet,m,pType,sType: isM}, m.dataset.display, location.href, location.host);
-    S["sSize"] = D["sSize"] * (s == "sm" ? .4 : s == "md" ? .6 : 1);
-    S["tSize"] = `${D["tSize"] * (s == "sm" ? .7 : s == "md" ? .75 : 1)}rem`;
-    S["tBottom"] = D[`tBottom-${s}`];
-    //    console.log(sSet["tBottomD-lg"]);
-    //console.log(sSize,m.dataset);
-    m.style.textAlign = S["sAlign"]; // dynamic: kept inline
+    for (let key in defaults) (typeof (settings[key]) == "undefined") && (settings[key] = defaults[key]); //Assign settings by type of current page (for Blogger)
+    // console.log({ settings, defaults, container }, container.dataset.display, location.href, location.host);
+    settings["sSize"] = defaults["sSize"] * (sizeKey == "sm" ? .4 : sizeKey == "md" ? .6 : 1);
+    settings["tSize"] = `${defaults["tSize"] * (sizeKey == "sm" ? .7 : sizeKey == "md" ? .75 : 1)}rem`;
+    settings["tBottom"] = defaults[`tBottom-${sizeKey}`];
+    //    console.log(settings["tBottomD-lg"]);
+    //console.log(settings["sSize"], container.dataset);
+    container.style.textAlign = settings["sAlign"]; // dynamic: kept inline
     // position: relative is now applied via .mStars CSS class
 
-    let R = localStorage["mSR_" + p];
-    //console.log(sSet["sSize"],isM);
+    let userRating = localStorage["mSR_" + pageKey];
+    //console.log(settings["sSize"], isVotesMode);
 
     //Text above and below the stars
-    var tTop = document.createElement("div"), tBottom = document.createElement("div");
-    S["tBottom"] = S["tBottom"].replace(/\$average\$/g, "<span class='mStars-average'>0</span>").replace(/\$votes\$/g, '<span class="mStars-votes">0</span>').replace(/\$max\$/g, S["sNo"]),
-        tTop.innerHTML = !R ? S["tTop"] : S["tDone"].replace(/\$userRating\$/g, R);
-    tBottom.innerHTML = S["tBottom"],
-        tTop.style.fontSize = tBottom.style.fontSize = S["tSize"],
-        tTop.style.color = tBottom.style.color = S["tColor"],
-        !isD && m.appendChild(tTop);
-    (!isD || isV) && m.appendChild(tBottom);
+    var labelTop = document.createElement("div"), labelBottom = document.createElement("div");
+    labelTop.setAttribute("aria-live", "polite"); // announces hover/confirm text to screen readers
+    settings["tBottom"] = settings["tBottom"].replace(/\$average\$/g, "<span class='mStars-average'>0</span>").replace(/\$votes\$/g, '<span class="mStars-votes">0</span>').replace(/\$max\$/g, settings["sNo"]),
+        labelTop.innerHTML = !userRating ? settings["tTop"] : settings["tDone"].replace(/\$userRating\$/g, userRating);
+    labelBottom.innerHTML = settings["tBottom"],
+        labelTop.style.fontSize = labelBottom.style.fontSize = settings["tSize"],
+        labelTop.style.color = labelBottom.style.color = settings["tColor"],
+        !isDisplayOnly && container.appendChild(labelTop);
+    (!isDisplayOnly || isVotesMode) && container.appendChild(labelBottom);
 
-    //    console.log(S["tSize"]);
+    //    console.log(settings["tSize"]);
 
-    let w = sRender(m, S, isD, isV, R, p, tTop);
+    let starsWrapper = sRender(container, settings, isDisplayOnly, isVotesMode, userRating, pageKey, labelTop);
 
-    //        console.log({ db });
-    onValue(db, s => {
-        var rArr = s.val() || { "r": 0, "c": 0 },
-            rating = (rArr.r * S["sNo"]).toFixed(2);
-        //                    console.log({ rArr });
-        if (rArr.c == 0) {
-            rArr = { "r": 1, "c": 1 }; //set to 1 to avoid search console error
-            set(db, rArr);
-        }
+    var ratingData = await dbRead(dbURL, path) || { "r": 0, "c": 0 },
+        rating = (ratingData.r * settings["sNo"]).toFixed(2);
+    //                    console.log({ ratingData });
+    if (ratingData.c == 0) {
+        ratingData = { "r": 1, "c": 1 }; //set to 1 to avoid search console error
+        dbWrite(dbURL, path, ratingData); // fire-and-forget, same as original
+    }
 
-        sUpdate(m, rating);         //Render stars
+    sUpdate(container, rating);         //Render stars
 
-        (!isD || isV) && (
-            m.getElementsByClassName("mStars-average")[0].textContent = rating,
-            m.getElementsByClassName("mStars-votes")[0].textContent = rArr.c);
-        //                console.log(m.getElementsByClassName("mStars-average"), m.getElementsByClassName("mStars-votes"));
-        if (!isD) {
-            w.onmouseleave = function () {
-                sUpdate(m, rating),
-                    tTop.innerHTML = !R ? S["tTop"] : S["tDone"].replace(/\$userRating\$/g, R);
-            },
-                Array.from(m.getElementsByTagName("svg")).forEach((e, i) => {
-                    e.onclick = function () {
-                        if (!R) {
-                            //rating update
-                            const c = rArr.c + 1,
-                                r = Math.round((rArr.r * rArr.c + (i + 1) / S["sNo"]) / c * 1000000) / 1000000;
-                            //                            console.log({ "r": r, "c": c,i });
-                            set(db, { "r": r, "c": c }).then(() => {
-                                R = localStorage["mSR_" + p] = i + 1;
-                                m.querySelectorAll("svg").forEach(e => e.style.cursor = "inherit");
-                                i >= 3 && tTip(S["tThanks"], m, i + 1, D["tSize"]);
-                                tTop.innerHTML = S["tTop"] + (i > 3 ? " Thanks!" : '');
-                                location.reload();
-                            });
-                        } else tTip(S["tDone"], m, R, D["tSize"]);
-                        //console.log(R);
-                    };
-                });
-        }
-    }, { onlyOnce: true });
+    (!isDisplayOnly || isVotesMode) && (
+        container.getElementsByClassName("mStars-average")[0].textContent = rating,
+        container.getElementsByClassName("mStars-votes")[0].textContent = ratingData.c);
+    //                console.log(container.getElementsByClassName("mStars-average"), container.getElementsByClassName("mStars-votes"));
+    if (!isDisplayOnly) {
+        starsWrapper.onmouseleave = function () {
+            sUpdate(container, rating),
+                labelTop.innerHTML = !userRating ? settings["tTop"] : settings["tDone"].replace(/\$userRating\$/g, userRating);
+        };
+        // Delegated click + keydown — single pair of listeners on wrapper instead of one per star
+        starsWrapper.addEventListener("click", async function (event) {
+            const clickedStar = event.target.closest("svg");
+            if (!clickedStar) return;
+            const allStars = Array.from(starsWrapper.querySelectorAll("svg"));
+            const idx = allStars.indexOf(clickedStar);
+            if (!userRating) {
+                //rating update
+                const newCount = ratingData.c + 1,
+                    newRating = Math.round((ratingData.r * ratingData.c + (idx + 1) / settings["sNo"]) / newCount * 1000000) / 1000000;
+                //console.log({ "newRating": newRating, "newCount": newCount, idx });
+                await dbWrite(dbURL, path, { "r": newRating, "c": newCount });
+                userRating = localStorage[`mSR_${pageKey}`] = idx + 1;
+                container.querySelectorAll("svg").forEach(starEl => starEl.style.cursor = "inherit");
+                idx >= 3 && tTip(settings["tThanks"], container, idx + 1, defaults["tSize"]);
+                labelTop.innerHTML = settings["tTop"] + (idx > 3 ? " Thanks!" : '');
+                location.reload();
+            } else tTip(settings["tDone"], container, userRating, defaults["tSize"]);
+        });
+        starsWrapper.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") {
+                if (event.target.closest("svg")) {
+                    event.preventDefault(); // prevent page scroll on Space
+                    event.target.click();
+                }
+            }
+        });
+    }
 }
 
 //mStars - Schema for Google Search Rich Reviews Snippet
-function sSchema(m, h, a) {
-    //        console.log({ m, db });
-    const p = pathFormat(m.dataset.url, h),
-        db = ref(getDatabase(a), `mStars/${h}/${p}`);
-
-    onValue(db, s => {
-        const rArr = s.val() || { "r": 1, "c": 1 },//set to 1 to avoid search console error
-            r = (rArr.r * 5).toFixed(2);
-        let b = m.closest(".post") || m.closest(".Blog"),
-            t = b.getElementsByClassName("ratingJSON"),
-            n = m.dataset.title == "" ? document.title : m.dataset.title,
-            type = m.dataset.schema,
-            j = t[0] || document.createElement("script");
-        t.length == 0 && (b.append(j), j.type = 'application/ld+json');
-        j.text = `{"@context": "https://schema.org/","@type": "${type}","name": "${n}","aggregateRating": {"@type": "AggregateRating","ratingValue": "${r}","worstRating": "1","bestRating": "5","ratingCount": "${rArr.c}"}}`;
-        //            console.log({ b, r, j }, j.textContent);
-    }, { onlyOnce: true });
+async function sSchema(container, host, dbURL) {
+    //        console.log({ container, dbURL });
+    const pageKey = pathFormat(container.dataset.url, host),
+        path = `mStars/${host}/${pageKey}`,
+        ratingData = await dbRead(dbURL, path) || { "r": 1, "c": 1 },//set to 1 to avoid search console error
+        avgRating = (ratingData.r * 5).toFixed(2);
+    let postEl = container.closest(".post") || container.closest(".Blog"),
+        existingScripts = postEl.getElementsByClassName("ratingJSON"),
+        title = container.dataset.title == "" ? document.title : container.dataset.title,
+        schemaType = container.dataset.schema,
+        schemaScript = existingScripts[0] || document.createElement("script");
+    existingScripts.length == 0 && (postEl.append(schemaScript), schemaScript.type = 'application/ld+json');
+    schemaScript.text = `{"@context": "https://schema.org/","@type": "${schemaType}","name": "${title}","aggregateRating": {"@type": "AggregateRating","ratingValue": "${avgRating}","worstRating": "1","bestRating": "5","ratingCount": "${ratingData.c}"}}`;
+    //            console.log({ postEl, avgRating, schemaScript }, schemaScript.textContent);
 }
 
 //Check if DB is ready
-function i(m) {
-    const h = location.host.replace("www.", "").replace(/\./g, "_").replace(/\//g, "__"),
-        d = document.getElementById("mStars").dataset.db || null,//db Path
-        a = !getApps.length ? initializeApp({ "databaseURL": d }, "mStars") : getApp("mStars"),
-        p = pathFormat(m.dataset.url, h),
-        db = ref(getDatabase(a), `mStars/${h}/${p}`);
-    //  console.log({ h, p, db });
+function initWidget(container) {
+    const host = location.host.replace("www.", "").replace(/\./g, "_").replace(/\//g, "__"),
+        dbRawURL = document.getElementById("mStars").dataset.db || null,//db Path
+        pageKey = pathFormat(container.dataset.url, host);
+    //  console.log({ host, pageKey });
 
-    switch (d) {
+    switch (dbRawURL) {
         case null: case "":
-            m.innerHTML = "Error! Missing Firebase DB URL >> 'https://YOUR-FIREBASE.firebaseio.com'."; break;
+            container.innerHTML = "Error! Missing Firebase DB URL >> 'https://YOUR-FIREBASE.firebaseio.com'."; break;
         default:
-            if (d.indexOf("https://") !== 0 || d.lastIndexOf("firebaseio.com") < 5)
-                m.innerHTML = "Error! Invalid Firebase URL.";
+            if (dbRawURL.indexOf("https://") !== 0 || dbRawURL.lastIndexOf("firebaseio.com") < 5)
+                container.innerHTML = "Error! Invalid Firebase URL.";
             else {
-                d.lastIndexOf("/") !== d.length - 1 && (d = `${d}/`);
-                //                        console.log({ f });
-                f && (f = !1, Array.from(document.getElementsByClassName("mStars")).forEach(m => typeof m.dataset.schema != "undefined" && sSchema(m, h, a)));
-                mStars(m, p, db);
+                const dbURL = dbRawURL.endsWith("/") ? dbRawURL : `${dbRawURL}/`; // normalize trailing slash
+                const path = `mStars/${host}/${pageKey}`;
+                //                        console.log({ isFirstWidget });
+                isFirstWidget && (isFirstWidget = false, Array.from(document.getElementsByClassName("mStars")).forEach(el => typeof el.dataset.schema != "undefined" && sSchema(el, host, dbURL)));
+                mStars(container, pageKey, dbURL, path);
             }
     }
 }
@@ -270,13 +305,13 @@ function mStarsCB(entries, observer) {
     entries.forEach((entry) => {
         if (entry.isIntersecting) {
             observer.unobserve(entry.target);
-            i(entry.target);
+            initWidget(entry.target);
         }
     });
 }
 
 injectStyles();
 const options = { rootMargin: '500px', threshold: 0.0 };
-let f = !0,
+let isFirstWidget = true,
     observer = new IntersectionObserver(mStarsCB, options);
-Array.from(document.getElementsByClassName("mStars")).forEach(e => observer.observe(e));
+Array.from(document.getElementsByClassName("mStars")).forEach(el => observer.observe(el));
