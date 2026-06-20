@@ -20,6 +20,21 @@ function dbWrite(dbURL, path, data) {
     });
 }
 
+function getCfg(container) {
+    let cfg = Object.assign({}, container.dataset);
+    const script = container.querySelector("script[type='application/json']");
+    if (script) {
+        try { Object.assign(cfg, JSON.parse(script.textContent)); } catch(e) {}
+    }
+    // Normalize specific widget properties
+    cfg.url = cfg.url || cfg.URL;
+    cfg.pagetype = cfg.pageType || cfg.pagetype;
+    cfg.display = String(cfg.display) === "true";
+    cfg.votes = String(cfg.votes) === "true";
+    cfg.title = cfg.title || "";
+    return cfg;
+}
+
 // Inject mStars CSS classes once
 let stylesInjected = false;
 function injectStyles() {
@@ -187,15 +202,17 @@ async function mStars(container, pageKey, dbURL, path) {
         Object.assign(mSettings.default, window.mStarsConfig);
     }
 
+    const cfg = getCfg(container);
     //console.log({ container });
-    const pageType = container.dataset.pagetype,
-        sizeKey = container.dataset.size || "lg",
-        isDisplayOnly = (container.dataset.display == "true"),//Display only
-        isVotesMode = (container.dataset.votes == "true"),
+    const pageType = cfg.pagetype,
+        sizeKey = cfg.size || "lg",
+        isDisplayOnly = cfg.display,//Display only
+        isVotesMode = cfg.votes,
         settings = mSettings[pageType],
         defaults = mSettings.default;
 
     for (let key in defaults) (typeof (settings[key]) == "undefined") && (settings[key] = defaults[key]); //Assign settings by type of current page (for Blogger)
+    Object.assign(settings, cfg); // Allow local widget JSON to override any setting
     // console.log({ settings, defaults, container }, container.dataset.display, location.href, location.host);
     settings["sSize"] = defaults["sSize"] * (sizeKey == "sm" ? .4 : sizeKey == "md" ? .6 : 1);
     settings["tSize"] = `${defaults["tSize"] * (sizeKey == "sm" ? .7 : sizeKey == "md" ? .75 : 1)}rem`;
@@ -275,14 +292,15 @@ async function mStars(container, pageKey, dbURL, path) {
 //mStars - Schema for Google Search Rich Reviews Snippet
 async function sSchema(container, host, dbURL) {
     //        console.log({ container, dbURL });
-    const pageKey = pathFormat(container.dataset.url, host),
+    const cfg = getCfg(container);
+    const pageKey = pathFormat(cfg.url, host),
         path = `mStars/${host}/${pageKey}`,
         ratingData = await dbRead(dbURL, path) || { "r": 1, "c": 1 },//set to 1 to avoid search console error
         avgRating = (ratingData.r * 5).toFixed(2);
     let postEl = container.closest(".post") || container.closest(".Blog"),
         existingScripts = postEl.getElementsByClassName("ratingJSON"),
-        title = container.dataset.title == "" ? document.title : container.dataset.title,
-        schemaType = container.dataset.schema,
+        title = cfg.title == "" ? document.title : cfg.title,
+        schemaType = cfg.schema,
         schemaScript = existingScripts[0] || document.createElement("script");
     existingScripts.length == 0 && (postEl.append(schemaScript), schemaScript.type = 'application/ld+json');
     schemaScript.text = `{"@context": "https://schema.org/","@type": "${schemaType}","name": "${title}","aggregateRating": {"@type": "AggregateRating","ratingValue": "${avgRating}","worstRating": "1","bestRating": "5","ratingCount": "${ratingData.c}"}}`;
@@ -291,9 +309,11 @@ async function sSchema(container, host, dbURL) {
 
 //Check if DB is ready
 function initWidget(container) {
+    const cfg = getCfg(container);
+    if (!cfg.url) return;
     const host = location.host.replace("www.", "").replace(/\./g, "_").replace(/\//g, "__"),
         dbRawURL = (document.querySelector("mstars") || document.getElementById("mStars"))?.dataset.db || null,//db Path — supports both <mstars> and <div id="mStars">
-        pageKey = pathFormat(container.dataset.url, host);
+        pageKey = pathFormat(cfg.url, host);
     //  console.log({ host, pageKey });
 
     switch (dbRawURL) {
@@ -306,7 +326,7 @@ function initWidget(container) {
                 const dbURL = dbRawURL.endsWith("/") ? dbRawURL : `${dbRawURL}/`; // normalize trailing slash
                 const path = `mStars/${host}/${pageKey}`;
                 //                        console.log({ isFirstWidget });
-                isFirstWidget && (isFirstWidget = false, Array.from(document.getElementsByClassName("mStars")).forEach(el => typeof el.dataset.schema != "undefined" && sSchema(el, host, dbURL)));
+                isFirstWidget && (isFirstWidget = false, Array.from(document.getElementsByClassName("mStars")).forEach(el => typeof getCfg(el).schema != "undefined" && sSchema(el, host, dbURL)));
                 mStars(container, pageKey, dbURL, path);
             }
     }
