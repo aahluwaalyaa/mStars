@@ -3,7 +3,7 @@
  * Demo @ https://mBlocksForBloggers.blogspot.com/
  * Documentation @ tbd
  * Agency @ https://CIA.RealHappinessCenter.com
- * Copyright (c) 2022, Mohanjeet Singh (https://Mohanjeet.blogspot.com/)
+ * Copyright (c) 2022, Aahluwaalyaa (https://msa.RealHappinessCenter.com/)
  * Released under the MIT license
  */
 //Settings and variable/const defintions
@@ -68,15 +68,15 @@ function sRender(e, S, isD, isV, R, p, tTop) {
         s.style = "display:inline-block;margin:0.1rem",
             s.style.cursor = !R && !isD ? "pointer" : "inherit";
 
-        !isD &&  (s.onmouseenter = function() {
-            if(!localStorage["mSR_" + p]){
-            let s = e.getElementsByTagName("svg");
+        !isD && (s.onmouseenter = function () {
+            if (!localStorage["mSR_" + p]) {
+                let s = e.getElementsByTagName("svg");
                 for (let j = 0; j < s.length; j++) {
                     s[j].style.fill = "gold", s[j].style.opacity = j < i ? 1 : .25;
                 }
                 (S["tTop"] != "") && (tTop.innerHTML = i + "/" + n);
             }
-            });
+        });
     }
     return w;
 }
@@ -111,7 +111,7 @@ function sSchema(e, r, c) {
 //onclick tooltip renderer
 function tTip(t, e, r, f) {
     const T = document.createElement("div"); T.innerHTML = t.replace(/\$userRating\$/g, r), T.style = "border-radius:7px;position:absolute;background:rgba(255,215,0,100%);padding:5px;text-align:center;opacity:0;transition:opacity 1s;width:200px;boxSizing:border-box;zIndex:9999999", T.style.fontSize = f; document.body.appendChild(T);
-//    console.log({t:T.style.fontSize,f});
+    //    console.log({t:T.style.fontSize,f});
     let b = e.getBoundingClientRect();
     //            console.log({eCoordinates});
     setTimeout(function () {
@@ -136,7 +136,7 @@ function mStars(m, dbPath, app) {
     for (let i in D) (typeof (S[i]) == "undefined") && (S[i] = D[i]); //Assign settings by type of current page (for Blogger)
     // console.log({sSet,dSet,m,pType,sType: isM}, m.dataset.display, location.href, location.host);
     S["sSize"] = D["sSize"] * (s == "sm" ? .4 : s == "md" ? .6 : 1);
-    S["tSize"] = D["tSize"] * (s == "sm" ? .7 : s == "md" ? .75 : 1) +"rem";
+    S["tSize"] = D["tSize"] * (s == "sm" ? .7 : s == "md" ? .75 : 1) + "rem";
     S["tBottom"] = D["tBottom-" + s];
     //    console.log(sSet["tBottomD-lg"]);
     //console.log(sSize,m.dataset);
@@ -161,7 +161,7 @@ function mStars(m, dbPath, app) {
         !isD && m.appendChild(tTop);
     (!isD || isV) && m.appendChild(tBottom);
 
-//    console.log(S["tSize"]);
+    //    console.log(S["tSize"]);
 
     //db
     switch (dbPath) {
@@ -175,9 +175,9 @@ function mStars(m, dbPath, app) {
 
     if (dbPath.indexOf("Error!") < 0) {
         let db = app.database().ref("mStars/" + h + "/" + p);
-//        console.log({ db });
+        //        console.log({ db });
         db.on("value", dbVal => {
-//            console.log({ db, dbVal },dbVal.val());
+            //            console.log({ db, dbVal },dbVal.val());
             let rArr = dbVal.val() || { "r": 0, "c": 0 },
                 rating = (rArr.r * S["sNo"]).toFixed(2);
             //                    console.log({ rArr });
@@ -195,25 +195,25 @@ function mStars(m, dbPath, app) {
                     sUpdate(m, rating),
                         tTop.innerHTML = !R ? S["tTop"] : S["tDone"].replace(/\$userRating\$/g, R);
                 },
-                    (!isV)&& (m.getElementsByClassName("mStars-average")[0].textContent = rating,
-                m.getElementsByClassName("mStars-votes")[0].textContent = rArr.c),
-                Array.from(m.getElementsByTagName("svg")).forEach((e, i) => {
-                    e.onclick = function () {
-                        if (!R) {
-                            //rating update
-                            const c = rArr.c + 1,
-                                r = Math.round((rArr.r * rArr.c + (i + 1)/S["sNo"]) / c * 1000000) / 1000000;
-//                            console.log({ "r": r, "c": c,i });
-                            db.set({ "r": r, "c": c });
-                            R = localStorage["mSR_" + p] = i + 1;
-                            m.querySelectorAll("svg").forEach(e => e.style.cursor = "inherit");
-                            
-                            i >= 3 && tTip(S["tThanks"], m, i + 1, D["tSize"]);
-                            tTop.innerHTML = S["tTop"] + (i > 3 ? " Thanks!" : '');
-                        } else tTip(S["tDone"], m, R, D["tSize"]);
-                        //console.log(R);
-                    };
-                });
+                    (!isV) && (m.getElementsByClassName("mStars-average")[0].textContent = rating,
+                        m.getElementsByClassName("mStars-votes")[0].textContent = rArr.c),
+                    Array.from(m.getElementsByTagName("svg")).forEach((e, i) => {
+                        e.onclick = function () {
+                            if (!R) {
+                                //rating update
+                                const c = rArr.c + 1,
+                                    r = Math.round((rArr.r * rArr.c + (i + 1) / S["sNo"]) / c * 1000000) / 1000000;
+                                //                            console.log({ "r": r, "c": c,i });
+                                db.set({ "r": r, "c": c });
+                                R = localStorage["mSR_" + p] = i + 1;
+                                m.querySelectorAll("svg").forEach(e => e.style.cursor = "inherit");
+
+                                i >= 3 && tTip(S["tThanks"], m, i + 1, D["tSize"]);
+                                tTop.innerHTML = S["tTop"] + (i > 3 ? " Thanks!" : '');
+                            } else tTip(S["tDone"], m, R, D["tSize"]);
+                            //console.log(R);
+                        };
+                    });
             }
         });
     } else m.innerHTML = dbPath;
