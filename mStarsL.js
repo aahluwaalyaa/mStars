@@ -3,7 +3,7 @@
  * Demo @ https://mBlocksForBloggers.blogspot.com/
  * Documentation @ m
  * Agency @ https://CIA.RealHappinessCenter.com
- * Copyright (c) 2022-26, Mohanjeet Singh (https://Mohanjeet.blogspot.com/)
+ * Copyright (c) 2022-26, Aahluwaalyaa (https://msa.RealHappinessCenter.com/)
  * Released under the MIT license
  */
 
@@ -37,7 +37,7 @@ function injectStyles() {
         .mStars-tooltip {
             border-radius: 7px;
             position: absolute;
-            background: rgba(255, 215, 0, 100%);
+            background: rgba(255, 215, 0, 100%); /* overridable via sTooltipBg setting */
             padding: 5px;
             text-align: center;
             width: 200px;
@@ -89,7 +89,7 @@ function sRender(container, settings, isDisplayOnly, isVotesMode, userRating, pa
     container.insertBefore(wrapper, container.lastChild);
 
     for (let i = 1; i <= starCount; i++) {
-        wrapper.insertAdjacentHTML("beforeend", `<svg xmlns="http://www.w3.org/2000/svg" width="${settings["sSize"]}rem" height="${settings["sSize"]}rem" fill="gold" class="bi bi-star-fill" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z" /></svg>`);
+        wrapper.insertAdjacentHTML("beforeend", `<svg xmlns="http://www.w3.org/2000/svg" width="${settings["sSize"]}rem" height="${settings["sSize"]}rem" fill="${settings["sColorFill"]}" class="bi bi-star-fill" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z" /></svg>`);
         const star = wrapper.lastChild;
         const isInteractive = !userRating && !isDisplayOnly;
         star.classList.add("mStars-star");
@@ -107,8 +107,8 @@ function sRender(container, settings, isDisplayOnly, isVotesMode, userRating, pa
             const allStars = Array.from(wrapper.querySelectorAll("svg"));
             const hoveredIdx = allStars.indexOf(hoveredStar); // 0-based
             allStars.forEach((star, j) => {
-                star.style.fill = "gold";
-                star.style.opacity = j <= hoveredIdx ? 1 : .25;
+                star.style.fill = settings["sColorFill"];
+                star.style.opacity = j <= hoveredIdx ? 1 : settings["sOpacityHover"];
             });
             (settings["tTop"] != "") && (labelTop.innerHTML = `${hoveredIdx + 1}/${starCount}`);
         });
@@ -118,7 +118,7 @@ function sRender(container, settings, isDisplayOnly, isVotesMode, userRating, pa
 }
 
 //Star Renderer
-function sUpdate(container, rating) {
+function sUpdate(container, rating, settings) {
     //        console.log({ container, rating });
     const stars = container.getElementsByTagName("svg"), fullStars = Math.floor(rating), fraction = rating - fullStars;
     //    console.log({ stars, fullStars, fraction });
@@ -127,18 +127,19 @@ function sUpdate(container, rating) {
         i > fullStars
             ? i == fullStars + 1 && fraction > 0
                 ? star.style.opacity = fraction
-                : (star.style.fill = "silver", star.style.opacity = .1)
-            : (star.style.fill = "gold", star.style.opacity = 1);
+                : (star.style.fill = settings["sColorEmpty"], star.style.opacity = settings["sOpacityEmpty"])
+            : (star.style.fill = settings["sColorFill"], star.style.opacity = 1);
     }
 }
 
 //onclick tooltip renderer
-function tTip(template, anchorEl, userRating, fontSize) {
+function tTip(template, anchorEl, userRating, fontSize, tooltipBg) {
     const tooltip = document.createElement("div");
     tooltip.innerHTML = template.replace(/\$userRating\$/g, userRating);
     tooltip.classList.add("mStars-tooltip");
     tooltip.setAttribute("role", "alert"); // announced by screen readers without needing focus
     tooltip.style.fontSize = fontSize; // dynamic: kept inline
+    tooltip.style.background = tooltipBg; // dynamic: overrides CSS default
     // Position relative to the widget container (already has position:relative via .mStars)
     tooltip.style.left = anchorEl.style.textAlign === "right"
         ? `calc(100% - 200px)`
@@ -157,11 +158,16 @@ async function mStars(container, pageKey, dbURL, path) {
     //Settings and variable/const definitions
     const mSettings = {
         "default": {
-            "sNo": 5,//Number > 0
+        "sNo": 5,//Number > 0
             "sSize": 2.5,//in rem, Number > 0
             "tSize": 1,//in rem, Number > 0
             "tColor": '',
             "sAlign": "center",
+            "sColorFill": "gold",   //Color of filled/hovered stars
+            "sColorEmpty": "silver",//Color of empty stars
+            "sOpacityEmpty": 0.1,  //Opacity of empty stars
+            "sOpacityHover": 0.25, //Opacity of dimmed stars during hover
+            "sTooltipBg": "rgba(255, 215, 0, 100%)",//Tooltip background colour
             "tTop": "Liked it? Rate it:",
             "tBottom-lg": "$average$ average • $votes$ ratings", //$max$
             "tBottom-md": "$average$ • $votes$ ratings", //$max$
@@ -174,6 +180,11 @@ async function mStars(container, pageKey, dbURL, path) {
         "index": {},
         "item": {},
         "static_page": {}
+    }
+
+    // Merge site-wide user config over hardcoded defaults — user omissions fall back to defaults above
+    if (typeof window.mStarsConfig === "object" && window.mStarsConfig !== null) {
+        Object.assign(mSettings.default, window.mStarsConfig);
     }
 
     //console.log({ container });
@@ -220,7 +231,7 @@ async function mStars(container, pageKey, dbURL, path) {
         dbWrite(dbURL, path, ratingData); // fire-and-forget, same as original
     }
 
-    sUpdate(container, rating);         //Render stars
+    sUpdate(container, rating, settings);         //Render stars
 
     (!isDisplayOnly || isVotesMode) && (
         container.getElementsByClassName("mStars-average")[0].textContent = rating,
@@ -228,7 +239,7 @@ async function mStars(container, pageKey, dbURL, path) {
     //                console.log(container.getElementsByClassName("mStars-average"), container.getElementsByClassName("mStars-votes"));
     if (!isDisplayOnly) {
         starsWrapper.onmouseleave = function () {
-            sUpdate(container, rating),
+            sUpdate(container, rating, settings),
                 labelTop.innerHTML = !userRating ? settings["tTop"] : settings["tDone"].replace(/\$userRating\$/g, userRating);
         };
         // Delegated click + keydown — single pair of listeners on wrapper instead of one per star
@@ -245,10 +256,10 @@ async function mStars(container, pageKey, dbURL, path) {
                 await dbWrite(dbURL, path, { "r": newRating, "c": newCount });
                 userRating = localStorage[`mSR_${pageKey}`] = idx + 1;
                 container.querySelectorAll("svg").forEach(starEl => starEl.style.cursor = "inherit");
-                idx >= 3 && tTip(settings["tThanks"], container, idx + 1, defaults["tSize"]);
+                idx >= 3 && tTip(settings["tThanks"], container, idx + 1, defaults["tSize"], settings["sTooltipBg"]);
                 labelTop.innerHTML = settings["tTop"] + (idx > 3 ? " Thanks!" : '');
                 location.reload();
-            } else tTip(settings["tDone"], container, userRating, defaults["tSize"]);
+            } else tTip(settings["tDone"], container, userRating, defaults["tSize"], settings["sTooltipBg"]);
         });
         starsWrapper.addEventListener("keydown", function (event) {
             if (event.key === "Enter" || event.key === " ") {
@@ -281,7 +292,7 @@ async function sSchema(container, host, dbURL) {
 //Check if DB is ready
 function initWidget(container) {
     const host = location.host.replace("www.", "").replace(/\./g, "_").replace(/\//g, "__"),
-        dbRawURL = document.getElementById("mStars").dataset.db || null,//db Path
+        dbRawURL = (document.querySelector("mstars") || document.getElementById("mStars"))?.dataset.db || null,//db Path — supports both <mstars> and <div id="mStars">
         pageKey = pathFormat(container.dataset.url, host);
     //  console.log({ host, pageKey });
 
