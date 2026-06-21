@@ -223,7 +223,9 @@ async function mStars(container, pageKey, dbURL, path) {
         settings["tSize"] = `${settings["tSize"]}rem`;
     }
     
-    settings["tBottom"] = defaults[`tBottom-${sizeKey}`];
+    if (!("tBottom" in cfg)) {
+        settings["tBottom"] = defaults[`tBottom-${sizeKey}`];
+    }
     //    console.log(settings["tBottomD-lg"]);
     //console.log(settings["sSize"], container.dataset);
     container.style.textAlign = settings["sAlign"]; // dynamic: kept inline
