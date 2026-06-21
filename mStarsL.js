@@ -24,7 +24,7 @@ function getCfg(container) {
     let cfg = Object.assign({}, container.dataset);
     const script = container.querySelector("script[type='application/json']");
     if (script) {
-        try { Object.assign(cfg, JSON.parse(script.textContent)); } catch(e) {}
+        try { Object.assign(cfg, JSON.parse(script.textContent)); } catch (e) { }
     }
     // Normalize specific widget properties
     cfg.url = cfg.url || cfg.URL;
@@ -173,7 +173,7 @@ async function mStars(container, pageKey, dbURL, path) {
     //Settings and variable/const definitions
     const mSettings = {
         "default": {
-        "sNo": 5,//Number > 0
+            "sNo": 5,//Number > 0
             "sSize": 2.5,//in rem, Number > 0
             "tSize": 1,//in rem, Number > 0
             "tColor": '',
@@ -213,9 +213,16 @@ async function mStars(container, pageKey, dbURL, path) {
 
     for (let key in defaults) (typeof (settings[key]) == "undefined") && (settings[key] = defaults[key]); //Assign settings by type of current page (for Blogger)
     Object.assign(settings, cfg); // Allow local widget JSON to override any setting
-    // console.log({ settings, defaults, container }, container.dataset.display, location.href, location.host);
-    settings["sSize"] = defaults["sSize"] * (sizeKey == "sm" ? .4 : sizeKey == "md" ? .6 : 1);
-    settings["tSize"] = `${defaults["tSize"] * (sizeKey == "sm" ? .7 : sizeKey == "md" ? .75 : 1)}rem`;
+    
+    if (!("sSize" in cfg)) {
+        settings["sSize"] = defaults["sSize"] * (sizeKey == "sm" ? .4 : sizeKey == "md" ? .6 : 1);
+    }
+    if (!("tSize" in cfg)) {
+        settings["tSize"] = `${defaults["tSize"] * (sizeKey == "sm" ? .7 : sizeKey == "md" ? .75 : 1)}rem`;
+    } else if (typeof settings["tSize"] === "number") {
+        settings["tSize"] = `${settings["tSize"]}rem`;
+    }
+    
     settings["tBottom"] = defaults[`tBottom-${sizeKey}`];
     //    console.log(settings["tBottomD-lg"]);
     //console.log(settings["sSize"], container.dataset);
