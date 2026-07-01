@@ -87,7 +87,7 @@ function pathFormat(url, host) {
             .replace(/^\/+|\/+$/g, "");
     }
     // Sanitize to Firebase-safe chars
-    cleaned = cleaned.replace(/[./]/g, "_").replace(/[,\s#@!$%&()]/g, "-");
+    cleaned = cleaned.replace(/\./g, "_").replace(/\//g, "__").replace(/,/g, "___").replace(/[\s#@!$%&()]/g, "-");
     return cleaned.replace(host, "");
 }
 
